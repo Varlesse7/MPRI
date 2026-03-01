@@ -246,6 +246,16 @@ and simplify2
      let fields = List.map local_simplify fields in
      TeData (dc, tys, fields, reset ())
 
+  | TeJoin (x, term1, term2) -> 
+    let te = simplify (Scope (subst, tsubst, term1)) in 
+    let te' = simplify (Scope (subst, tsubst, term2)) in 
+    TeJoin(x, te, te')
+
+  | TeJump (x, tys, args, ty) -> 
+    let tys = List.map (Tsubst.apply tsubst) tys in 
+    let ty = Tsubst.apply tsubst ty in 
+    let args = List.map (fun t -> simplify (Scope (subst, tsubst, t))) args in 
+    TeJump (x, tys, args, ty)
 
   | _ -> assert false
 

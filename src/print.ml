@@ -214,6 +214,8 @@ exception Inconsistency
 (* Terms. Normal mode. *)
 
 let rec pterm0 env = function
+  | TeJump(x, tys, args, ty) -> 
+    parens (group (string "jump" ^^ space ^^ pvar env x ^^ concat_map (brackets_pty env) tys ^^ space ^^ pfields (pterm env) args ^^ colon ^^ pty env ty))
   | TeLoc (_, term) ->
       pterm0 env term
   | TeVar (x, _) ->
@@ -243,6 +245,10 @@ and pterm1 env term =
 
 and pterm env term =
   group (match term with
+  | TeJoin (x, term1, term2) -> 
+      let print_def_term = pterm env term1 in 
+      let env = Export.bind env x in 
+      definition(string "join" ^^ line ^^ pvar env x ^^ equal) print_def_term (pterm env term2)
   | TeLoc (_, term) ->
       pterm env term
 

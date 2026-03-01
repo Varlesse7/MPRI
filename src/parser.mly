@@ -248,6 +248,12 @@ term:
 | LET f = term_variable def = non_recursive_def IN t = loc(term)
     { SynTeLet (f, def, t) }
 
+| JOIN f = term_variable def = non_recursive_def IN t = loc(term)
+    {SynTeJoin (f, def, t)}
+| JUMP j = term_variable tys =  multiple(actual_type_arguments)
+  LBRACE args = semi(loc(term)) RBRACE COLON ty = typ 
+    {SynTeJump (j, tys, args, ty)}
+
 
 (* ------------------------------------------------------------------------- *)
 

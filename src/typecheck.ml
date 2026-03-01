@@ -113,7 +113,7 @@ let rec infer              (* [infer] expects... *)
     check p xenv tsubst tenv jenv ten ty;
     ty
   | TeMatch (te1, ty, cl, info) ->  
-    let ty' = infer p xenv loc tsubst tenv jempty te1 in 
+    let ty' = infer p xenv loc tsubst tenv jenv te1 in 
     
     info := Some ty'; 
 
@@ -122,6 +122,31 @@ let rec infer              (* [infer] expects... *)
     ty
 
   | TeLoc (loc, te) -> infer p xenv loc tsubst tenv jenv te
+  | TeJoin (x, term1, term2) ->
+      let rec collect_ty_abs = function
+        | TeTyAbs (a, body) ->
+            let (tvs, rest) = collect_ty_abs body in (a :: tvs, rest)
+        | TeLoc (_, t) -> collect_ty_abs t
+        | t -> ([], t)
+      in
+      let rec collect_abs = function
+        | TeAbs (_, ty, body) ->
+            let (ps, rest) = collect_abs body in (ty :: ps, rest)
+        | TeLoc (_, t) -> collect_abs t
+        | TeTyAnnot (t, _) -> collect_abs t
+        | t -> ([], t)
+      in
+      let (tyvars, after_tyabs) = collect_ty_abs term1 in
+      let (param_tys, _) = collect_abs after_tyabs in
+      let term1_ty = infer p xenv loc tsubst tenv jempty term1 in
+      let jenv = jbind x tyvars param_tys jenv in
+      infer p xenv loc tsubst tenv jenv term2
+  | TeJump (x, tys, args, ty) -> 
+    let (tyvars, param_tys) = jlookup x jenv in 
+    let tsubst' = List.fold_left2(fun ts tv ty -> TS.bind tv ty ts) TS.empty tyvars tys in 
+    List.iter2(fun arg pty -> check p xenv tsubst tenv jenv arg (TS.apply tsubst' pty)) args param_tys; 
+    ty
+
 
 and check                  (* [check] expects... *)
     (p : pre_program)      (* a program, which provides information about type & data constructors; *)
@@ -301,4 +326,6 @@ let rec type_of (term: fterm): ftype =
 
   | TeTyAnnot (_, ty) -> ty
   | TeLoc (_, term) -> type_of term
+  | TeJoin (_, _,  term) -> type_of term
+  | TeJump (_, _, _, ty) -> ty
 
