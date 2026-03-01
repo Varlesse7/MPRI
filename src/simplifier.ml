@@ -293,10 +293,27 @@ and apply (t: pre_fterm): context -> pre_fterm = function
      let ty = Tsubst.apply tsubst ty in
      apply (TeTyApp (t, ty, reset ())) args
   | CtxtMatch (Scope (subst, tsubst, (ty, cases, info)), args) -> 
-        let ty = Tsubst.apply tsubst ty in
-        let local_sclauses case = simplify_clause t (Scope (subst, tsubst, case)) in
-        let cases = List.map local_sclauses cases in
-        apply (TeMatch (t, ty, cases, reset ())) args
+    let ty = Tsubst.apply tsubst ty in 
+    begin 
+      match t with 
+      | TeMatch (scrutinee, ty', clauses', _) when !optimize_caseofcase -> 
+        let x = Atom.fresh (Identifier.make "x" (0, "term") Lexing.dummy_pos Lexing.dummy_pos) in 
+        let y = Atom.fresh (Identifier.make "y" (0, "term") Lexing.dummy_pos Lexing.dummy_pos) in 
+        
+        let y_var = TeVar(y, reset()) in 
+        
+        let simplified_outer = List.map(fun c -> simplify_clause y_var (Scope (subst, tsubst, c))) cases in 
+        let join_body = TeAbs(y, ty', TeMatch (TeVar (y, reset()), ty, simplified_outer, reset())) in 
+        
+        let clauses_in = List.map(fun (Clause (pat, body)) -> Clause (pat, TeJump(x, [], [body], ty))) clauses' in 
+
+        let result = TeJoin(x, join_body, TeMatch(scrutinee, ty, clauses_in, reset())) in
+        apply result args
+      | _ -> 
+        let local_sclauses case = simplify_clause t (Scope (subst, tsubst, case)) in 
+        let cases = List.map local_sclauses cases in 
+        apply (TeMatch (t, ty, cases, reset())) args
+    end
 
 
 (* ------------------------------------------------------------------------- *)
